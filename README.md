@@ -6,7 +6,7 @@ Raft-Redcon
 Raft-Redcon is a raft transport layer that implements the [Redis Protocol](http://redis.io/topics/protocol). 
 It's intended to be used with [hashicorp/raft](https://github.com/hashicorp/raft).
 It utilizes [Redcon](https://github.com/tidwall/redcon) under the hood,
-and is a central component of the [Plume](https://github.com/tidwall/plume) project.
+and is a central component of the [Finn](https://github.com/tidwall/finn) project.
 
 Contact
 -------
