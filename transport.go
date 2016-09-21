@@ -549,8 +549,8 @@ func response(rd *bufio.Reader) ([]byte, error) {
 	switch c {
 	default:
 		return nil, errors.New("invalid response")
-	case '+', '-', '$':
-		line, err := rd.ReadString('\n')
+	case '+', '-', '$', ':', '*':
+		line, err := rd.ReadBytes('\n')
 		if err != nil {
 			return nil, err
 		}
@@ -561,12 +561,27 @@ func response(rd *bufio.Reader) ([]byte, error) {
 		switch c {
 		default:
 			return nil, errors.New("invalid response")
-		case '+':
-			return []byte(line), nil
+		case '*':
+			n, err := strconv.ParseUint(string(line), 10, 64)
+			if err != nil {
+				return nil, err
+			}
+			var buf []byte
+			for i := 0; i < int(n); i++ {
+				res, err := response(rd)
+				if err != nil {
+					return nil, err
+				}
+				buf = append(buf, res...)
+				buf = append(buf, "\n"...)
+			}
+			return buf, nil
+		case '+', ':':
+			return line, nil
 		case '-':
-			return nil, errors.New(line)
+			return nil, errors.New(string(line))
 		case '$':
-			n, err := strconv.ParseUint(line, 10, 64)
+			n, err := strconv.ParseUint(string(line), 10, 64)
 			if err != nil {
 				return nil, err
 			}
