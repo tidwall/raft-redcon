@@ -94,7 +94,6 @@ func (t *RedconTransport) Close() error {
 		return errors.New("closed")
 	}
 	t.closed = true
-	close(t.consumer)
 	t.server.Close()
 	for _, pool := range t.pools {
 		pool.Close()
