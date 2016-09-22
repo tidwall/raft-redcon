@@ -612,3 +612,61 @@ func buildCommand(buf []byte, args ...[]byte) []byte {
 	}
 	return buf
 }
+
+func ReadRawResponse(rd *bufio.Reader) (raw []byte, kind byte, err error) {
+	kind, err = rd.ReadByte()
+	if err != nil {
+		return raw, kind, err
+	}
+	raw = append(raw, kind)
+	switch kind {
+	default:
+		return raw, kind, errors.New("invalid response")
+	case '+', '-', '$', ':', '*':
+		line, err := rd.ReadBytes('\n')
+		if err != nil {
+			return raw, kind, err
+		}
+		raw = append(raw, line...)
+		if len(line) < 2 || line[len(line)-2] != '\r' {
+			return raw, kind, errors.New("invalid response")
+		}
+		line = line[:len(line)-2]
+		switch kind {
+		default:
+			return raw, kind, errors.New("invalid response")
+		case '+', ':', '-':
+			return raw, kind, nil
+		case '*':
+			n, err := strconv.ParseInt(string(line), 10, 64)
+			if err != nil {
+				return raw, kind, err
+			}
+			if n > 0 {
+				for i := 0; i < int(n); i++ {
+					res, _, err := ReadRawResponse(rd)
+					if err != nil {
+						return raw, kind, err
+					}
+					raw = append(raw, res...)
+				}
+			}
+		case '$':
+			n, err := strconv.ParseInt(string(line), 10, 64)
+			if err != nil {
+				return raw, kind, err
+			}
+			if n > 0 {
+				data := make([]byte, int(n)+2)
+				if _, err := io.ReadFull(rd, data); err != nil {
+					return raw, kind, err
+				}
+				if data[len(data)-2] != '\r' || data[len(data)-1] != '\n' {
+					return raw, kind, errors.New("invalid response")
+				}
+				raw = append(raw, data...)
+			}
+		}
+		return raw, kind, nil
+	}
+}
