@@ -26,32 +26,32 @@ var (
 )
 
 type RedconTransport struct {
-	addr     raft.ServerAddress
+	addr     string
 	consumer chan raft.RPC
 	handleFn func(conn redcon.Conn, cmd redcon.Command)
 	server   *redcon.Server
 
 	mu     sync.Mutex
-	pools  map[raft.ServerID]*redis.Pool
+	pools  map[string]*redis.Pool
 	closed bool
 	log    io.Writer
 }
 
 func NewRedconTransport(
-	bindAddr raft.ServerAddress,
+	bindAddr string,
 	handle func(conn redcon.Conn, cmd redcon.Command),
 	accept func(conn redcon.Conn) bool,
 	closed func(conn redcon.Conn, err error),
 	logOutput io.Writer,
 ) (*RedconTransport, error) {
 	t := &RedconTransport{
-		addr:     raft.ServerAddress(bindAddr),
+		addr:     bindAddr,
 		consumer: make(chan raft.RPC),
 		handleFn: handle,
-		pools:    make(map[raft.ServerID]*redis.Pool),
+		pools:    make(map[string]*redis.Pool),
 		log:      logOutput,
 	}
-	t.server = redcon.NewServer(string(bindAddr),
+	t.server = redcon.NewServer(bindAddr,
 		func(conn redcon.Conn, cmd redcon.Command) {
 			t.handle(conn, cmd)
 		}, accept, closed)
@@ -65,12 +65,12 @@ func NewRedconTransport(
 }
 
 // newTargetPool returns a Redigo pool for the specified target node.
-func newTargetPool(serverID raft.ServerID, serverAddr raft.ServerAddress) *redis.Pool {
+func newTargetPool(target string) *redis.Pool {
 	return &redis.Pool{
 		MaxIdle:     5,           // figure 5 should suffice most clusters.
 		IdleTimeout: time.Minute, //
 		Dial: func() (redis.Conn, error) {
-			c, err := redis.Dial("tcp", string(serverAddr))
+			c, err := redis.Dial("tcp", target)
 			if err != nil {
 				return nil, err
 			}
@@ -103,23 +103,23 @@ func (t *RedconTransport) Close() error {
 }
 
 // getPool returns a usable pool for obtaining a connection to the specified target.
-func (t *RedconTransport) getPool(serverID raft.ServerID, serverAddr raft.ServerAddress) (*redis.Pool, error) {
+func (t *RedconTransport) getPool(target string) (*redis.Pool, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	if t.closed {
 		return nil, errors.New("closed")
 	}
-	pool, ok := t.pools[serverID]
+	pool, ok := t.pools[target]
 	if !ok {
-		pool = newTargetPool(serverID, serverAddr)
-		t.pools[serverID] = pool
+		pool = newTargetPool(target)
+		t.pools[target] = pool
 	}
 	return pool, nil
 }
 
 // getConn returns a connection to the target.
-func (t *RedconTransport) getConn(serverID raft.ServerID, serverAddr raft.ServerAddress) (redis.Conn, error) {
-	pool, err := t.getPool(serverID, serverAddr)
+func (t *RedconTransport) getConn(target string) (redis.Conn, error) {
+	pool, err := t.getPool(target)
 	if err != nil {
 		return nil, err
 	}
@@ -127,7 +127,7 @@ func (t *RedconTransport) getConn(serverID raft.ServerID, serverAddr raft.Server
 }
 
 // AppendEntriesPipeline returns an interface that can be used to pipeline AppendEntries requests.
-func (t *RedconTransport) AppendEntriesPipeline(serverID raft.ServerID, serverAddr raft.ServerAddress) (raft.AppendPipeline, error) {
+func (t *RedconTransport) AppendEntriesPipeline(target string) (raft.AppendPipeline, error) {
 	return nil, raft.ErrPipelineReplicationNotSupported
 }
 
@@ -231,11 +231,8 @@ func decodeAppendEntriesResponse(b []byte, args *raft.AppendEntriesResponse) boo
 }
 
 // AppendEntries implements the Transport interface.
-func (t *RedconTransport) AppendEntries(
-	serverID raft.ServerID, serverAddr raft.ServerAddress,
-	args *raft.AppendEntriesRequest, resp *raft.AppendEntriesResponse,
-) error {
-	conn, err := t.getConn(serverID, serverAddr)
+func (t *RedconTransport) AppendEntries(target string, args *raft.AppendEntriesRequest, resp *raft.AppendEntriesResponse) error {
+	conn, err := t.getConn(target)
 	if err != nil {
 		return err
 	}
@@ -284,12 +281,9 @@ func (t *RedconTransport) handleAppendEntries(cmd redcon.Command) ([]byte, error
 }
 
 // RequestVote implements the Transport interface.
-func (t *RedconTransport) RequestVote(
-	serverID raft.ServerID, serverAddr raft.ServerAddress,
-	args *raft.RequestVoteRequest, resp *raft.RequestVoteResponse,
-) error {
+func (t *RedconTransport) RequestVote(target string, args *raft.RequestVoteRequest, resp *raft.RequestVoteResponse) error {
 	data, _ := json.Marshal(args)
-	val, _, err := Do(serverAddr, nil, []byte("raftrequestvote"), data)
+	val, _, err := Do(target, nil, []byte("raftrequestvote"), data)
 	if err != nil {
 		return err
 	}
@@ -326,12 +320,11 @@ func (t *RedconTransport) handleRequestVote(cmd redcon.Command) ([]byte, error) 
 
 // InstallSnapshot implmenents the Transport interface.
 func (t *RedconTransport) InstallSnapshot(
-	serverID raft.ServerID, serverAddr raft.ServerAddress,
-	args *raft.InstallSnapshotRequest, resp *raft.InstallSnapshotResponse, data io.Reader,
+	target string, args *raft.InstallSnapshotRequest, resp *raft.InstallSnapshotResponse, data io.Reader,
 ) error {
 	// Use a dedicated connection for snapshots. This operation happens very infrequently, but when it does
 	// it often passes a lot of data.
-	conn, err := net.Dial("tcp", string(serverAddr))
+	conn, err := net.Dial("tcp", target)
 	if err != nil {
 		return err
 	}
@@ -516,17 +509,13 @@ func (t *RedconTransport) handle(conn redcon.Conn, cmd redcon.Command) {
 func (t *RedconTransport) Consumer() <-chan raft.RPC { return t.consumer }
 
 // LocalAddr implmenents the Transport interface.
-func (t *RedconTransport) LocalAddr() raft.ServerAddress { return t.addr }
+func (t *RedconTransport) LocalAddr() string { return t.addr }
 
 // EncodePeer implmenents the Transport interface.
-func (t *RedconTransport) EncodePeer(serverID raft.ServerID, serverAddr raft.ServerAddress) []byte {
-	return []byte(serverAddr)
-}
+func (t *RedconTransport) EncodePeer(peer string) []byte { return []byte(peer) }
 
 // DecodePeer implmenents the Transport interface.
-func (t *RedconTransport) DecodePeer(peer []byte) raft.ServerAddress {
-	return raft.ServerAddress(peer)
-}
+func (t *RedconTransport) DecodePeer(peer []byte) string { return string(peer) }
 
 // SetHeartbeatHandler implmenents the Transport interface.
 func (t *RedconTransport) SetHeartbeatHandler(cb func(rpc raft.RPC)) {}
@@ -538,11 +527,9 @@ func (t *RedconTransport) SetHeartbeatHandler(cb func(rpc raft.RPC)) {}
 // The args are the command arguments such as "SET", "key", "value".
 // Return response is a bulk, string, or an error.
 // The nbuf is a reuseable buffer, this can be ignored.
-func Do(serverAddr raft.ServerAddress,
-	buf []byte, args ...[]byte) (resp []byte, nbuf []byte, err error,
-) {
+func Do(addr string, buf []byte, args ...[]byte) (resp []byte, nbuf []byte, err error) {
 	cmd := buildCommand(buf, args...)
-	conn, err := net.Dial("tcp", string(serverAddr))
+	conn, err := net.Dial("tcp", addr)
 	if err != nil {
 		return nil, cmd, err
 	}

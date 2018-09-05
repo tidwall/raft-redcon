@@ -11,7 +11,6 @@ import (
 )
 
 const addr = ":17831"
-const id = "abc123"
 
 func TestServer(t *testing.T) {
 	s, err := NewRedconTransport(addr, passthroughHandler, nil, nil, nil)
@@ -43,9 +42,9 @@ func TestServer(t *testing.T) {
 			case *raft.AppendEntriesRequest:
 				if len(args.Entries) != 2 {
 					err = fmt.Errorf("expecting '2', got '%v'", len(args.Entries))
-				} else if string(args.Entries[0].Data) != "log1" || args.Entries[0].Index != 1 || args.Entries[0].Term != 2 || args.Entries[0].Type != raft.LogAddPeerDeprecated {
+				} else if string(args.Entries[0].Data) != "log1" || args.Entries[0].Index != 1 || args.Entries[0].Term != 2 || args.Entries[0].Type != raft.LogAddPeer {
 					err = fmt.Errorf("invalid log entry 1")
-				} else if string(args.Entries[1].Data) != "log2" || args.Entries[1].Index != 3 || args.Entries[1].Term != 4 || args.Entries[1].Type != raft.LogRemovePeerDeprecated {
+				} else if string(args.Entries[1].Data) != "log2" || args.Entries[1].Index != 3 || args.Entries[1].Term != 4 || args.Entries[1].Type != raft.LogRemovePeer {
 					err = fmt.Errorf("invalid log entry 2")
 				} else if string(args.Leader) != "leader" {
 					err = fmt.Errorf("expecting 'leader', got '%v'", string(args.Leader))
@@ -111,7 +110,7 @@ func SubInstallSnapshot(t *testing.T, s *RedconTransport) {
 	args.Peers = []byte("peers")
 	args.Size = 3
 	args.Term = 4
-	if err := s.InstallSnapshot(id, addr, &args, &resp, bytes.NewBufferString("look ma, i've gots the data!")); err != nil {
+	if err := s.InstallSnapshot(addr, &args, &resp, bytes.NewBufferString("look ma, i've gots the data!")); err != nil {
 		t.Fatal(err)
 	}
 	if resp.Success != true {
@@ -125,15 +124,15 @@ func SubAppendEntries(t *testing.T, s *RedconTransport) {
 	var args raft.AppendEntriesRequest
 	var resp raft.AppendEntriesResponse
 	args.Entries = []*raft.Log{
-		&raft.Log{Data: []byte("log1"), Index: 1, Term: 2, Type: raft.LogAddPeerDeprecated},
-		&raft.Log{Data: []byte("log2"), Index: 3, Term: 4, Type: raft.LogRemovePeerDeprecated},
+		&raft.Log{Data: []byte("log1"), Index: 1, Term: 2, Type: raft.LogAddPeer},
+		&raft.Log{Data: []byte("log2"), Index: 3, Term: 4, Type: raft.LogRemovePeer},
 	}
 	args.Leader = []byte("leader")
 	args.LeaderCommitIndex = 5
 	args.PrevLogEntry = 6
 	args.PrevLogTerm = 7
 	args.Term = 8
-	if err := s.AppendEntries(id, addr, &args, &resp); err != nil {
+	if err := s.AppendEntries(addr, &args, &resp); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -144,7 +143,7 @@ func SubRequestVote(t *testing.T, s *RedconTransport) {
 	args.LastLogIndex = 1
 	args.LastLogTerm = 2
 	args.Term = 3
-	if err := s.RequestVote(id, addr, &args, &resp); err != nil {
+	if err := s.RequestVote(addr, &args, &resp); err != nil {
 		t.Fatal(err)
 	}
 	if resp.Granted != true {
