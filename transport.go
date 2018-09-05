@@ -14,8 +14,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/garyburd/redigo/redis"
-	"github.com/hashicorp/raft"
+	"github.com/gomodule/redigo/redis"
+	"github.com/tidwall/raft"
 	"github.com/tidwall/redcon"
 )
 

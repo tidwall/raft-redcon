@@ -6,7 +6,7 @@ import (
 	"io/ioutil"
 	"testing"
 
-	"github.com/hashicorp/raft"
+	"github.com/tidwall/raft"
 	"github.com/tidwall/redcon"
 )
 
