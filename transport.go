@@ -25,6 +25,7 @@ var (
 	errInvalidResponse     = errors.New("invalid response")
 )
 
+// RedconTransport is a raft transport
 type RedconTransport struct {
 	addr     string
 	consumer chan raft.RPC
@@ -37,6 +38,7 @@ type RedconTransport struct {
 	log    io.Writer
 }
 
+// NewRedconTransport creates a new RedconTransport
 func NewRedconTransport(
 	bindAddr string,
 	handle func(conn redcon.Conn, cmd redcon.Command),
@@ -102,7 +104,8 @@ func (t *RedconTransport) Close() error {
 	return nil
 }
 
-// getPool returns a usable pool for obtaining a connection to the specified target.
+// getPool returns a usable pool for obtaining a connection to the specified
+// target.
 func (t *RedconTransport) getPool(target string) (*redis.Pool, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -126,8 +129,11 @@ func (t *RedconTransport) getConn(target string) (redis.Conn, error) {
 	return pool.Get(), nil
 }
 
-// AppendEntriesPipeline returns an interface that can be used to pipeline AppendEntries requests.
-func (t *RedconTransport) AppendEntriesPipeline(target string) (raft.AppendPipeline, error) {
+// AppendEntriesPipeline returns an interface that can be used to pipeline
+// AppendEntries requests.
+func (t *RedconTransport) AppendEntriesPipeline(target string) (
+	raft.AppendPipeline, error,
+) {
 	return nil, raft.ErrPipelineReplicationNotSupported
 }
 
@@ -159,7 +165,10 @@ func encodeAppendEntriesRequest(args *raft.AppendEntriesRequest) []byte {
 
 // decodeAppendEntriesRequest decodes AppendEntriesRequest data.
 // Returns true when successful
-func decodeAppendEntriesRequest(b []byte, args *raft.AppendEntriesRequest) bool {
+func decodeAppendEntriesRequest(
+	b []byte,
+	args *raft.AppendEntriesRequest,
+) bool {
 	if len(b) < 40 {
 		return false
 	}
@@ -187,7 +196,8 @@ func decodeAppendEntriesRequest(b []byte, args *raft.AppendEntriesRequest) bool 
 		args.Entries[i].Index = binary.LittleEndian.Uint64(b[0:8])
 		args.Entries[i].Term = binary.LittleEndian.Uint64(b[8:16])
 		args.Entries[i].Type = raft.LogType(b[16])
-		args.Entries[i].Data = make([]byte, int(binary.LittleEndian.Uint64(b[17:25])))
+		args.Entries[i].Data = make([]byte,
+			int(binary.LittleEndian.Uint64(b[17:25])))
 		b = b[25:]
 		if len(b) < len(args.Entries[i].Data) {
 			return false
@@ -211,7 +221,9 @@ func encodeAppendEntriesResponse(args *raft.AppendEntriesResponse) []byte {
 	return b
 }
 
-func decodeAppendEntriesResponse(b []byte, args *raft.AppendEntriesResponse) bool {
+func decodeAppendEntriesResponse(
+	b []byte, args *raft.AppendEntriesResponse,
+) bool {
 	if len(b) != 18 {
 		return false
 	}
@@ -231,7 +243,9 @@ func decodeAppendEntriesResponse(b []byte, args *raft.AppendEntriesResponse) boo
 }
 
 // AppendEntries implements the Transport interface.
-func (t *RedconTransport) AppendEntries(target string, args *raft.AppendEntriesRequest, resp *raft.AppendEntriesResponse) error {
+func (t *RedconTransport) AppendEntries(target string,
+	args *raft.AppendEntriesRequest, resp *raft.AppendEntriesResponse,
+) error {
 	conn, err := t.getConn(target)
 	if err != nil {
 		return err
@@ -255,7 +269,9 @@ func (t *RedconTransport) AppendEntries(target string, args *raft.AppendEntriesR
 	}
 }
 
-func (t *RedconTransport) handleAppendEntries(cmd redcon.Command) ([]byte, error) {
+func (t *RedconTransport) handleAppendEntries(cmd redcon.Command) (
+	[]byte, error,
+) {
 	if len(cmd.Args) != 2 {
 		return nil, errInvalidNumberOfArgs
 	}
@@ -281,7 +297,9 @@ func (t *RedconTransport) handleAppendEntries(cmd redcon.Command) ([]byte, error
 }
 
 // RequestVote implements the Transport interface.
-func (t *RedconTransport) RequestVote(target string, args *raft.RequestVoteRequest, resp *raft.RequestVoteResponse) error {
+func (t *RedconTransport) RequestVote(target string,
+	args *raft.RequestVoteRequest, resp *raft.RequestVoteResponse,
+) error {
 	data, _ := json.Marshal(args)
 	val, _, err := Do(target, nil, []byte("raftrequestvote"), data)
 	if err != nil {
@@ -293,7 +311,9 @@ func (t *RedconTransport) RequestVote(target string, args *raft.RequestVoteReque
 	return nil
 }
 
-func (t *RedconTransport) handleRequestVote(cmd redcon.Command) ([]byte, error) {
+func (t *RedconTransport) handleRequestVote(cmd redcon.Command) (
+	[]byte, error,
+) {
 	if len(cmd.Args) != 2 {
 		return nil, errInvalidNumberOfArgs
 	}
@@ -320,10 +340,11 @@ func (t *RedconTransport) handleRequestVote(cmd redcon.Command) ([]byte, error) 
 
 // InstallSnapshot implmenents the Transport interface.
 func (t *RedconTransport) InstallSnapshot(
-	target string, args *raft.InstallSnapshotRequest, resp *raft.InstallSnapshotResponse, data io.Reader,
+	target string, args *raft.InstallSnapshotRequest,
+	resp *raft.InstallSnapshotResponse, data io.Reader,
 ) error {
-	// Use a dedicated connection for snapshots. This operation happens very infrequently, but when it does
-	// it often passes a lot of data.
+	// Use a dedicated connection for snapshots. This operation happens very
+	// infrequently, but when it does it often passes a lot of data.
 	conn, err := net.Dial("tcp", target)
 	if err != nil {
 		return err
@@ -336,7 +357,9 @@ func (t *RedconTransport) InstallSnapshot(
 		return err
 	}
 	// send RAFTINSTALLSNAPSHOT {args}
-	if _, err := conn.Write(buildCommand(nil, []byte("raftinstallsnapshot"), rdata)); err != nil {
+	if _, err := conn.Write(
+		buildCommand(nil, []byte("raftinstallsnapshot"), rdata),
+	); err != nil {
 		return err
 	}
 	// receive +OK
@@ -391,7 +414,9 @@ func (t *RedconTransport) InstallSnapshot(
 	return nil
 }
 
-func (t *RedconTransport) handleInstallSnapshot(conn redcon.DetachedConn, arg []byte) {
+func (t *RedconTransport) handleInstallSnapshot(conn redcon.DetachedConn,
+	arg []byte,
+) {
 	err := func() error {
 		var rpc raft.RPC
 		rpc.Command = &raft.InstallSnapshotRequest{}
@@ -457,10 +482,12 @@ func (t *RedconTransport) handleInstallSnapshot(conn redcon.DetachedConn, arg []
 	}()
 	if t.log != nil {
 		if err != nil {
-			fmt.Fprintf(t.log, "%s [WARN] transport: Handle snapshot failed: %v\n",
+			fmt.Fprintf(t.log,
+				"%s [WARN] transport: Handle snapshot failed: %v\n",
 				time.Now().Format("2006/01/02 15:04:05"), err)
 		} else {
-			fmt.Fprintf(t.log, "%s [VERB] transport: Handle shapshot completed\n",
+			fmt.Fprintf(t.log,
+				"%s [VERB] transport: Handle shapshot completed\n",
 				time.Now().Format("2006/01/02 15:04:05"))
 		}
 	}
@@ -496,7 +523,8 @@ func (t *RedconTransport) handle(conn redcon.Conn, cmd redcon.Command) {
 	}
 	if err != nil {
 		if err == errInvalidNumberOfArgs {
-			conn.WriteError("ERR wrong number of arguments for '" + string(cmd.Args[0]) + "' command")
+			conn.WriteError("ERR wrong number of arguments for '" +
+				string(cmd.Args[0]) + "' command")
 		} else {
 			conn.WriteError("ERR " + err.Error())
 		}
@@ -527,7 +555,9 @@ func (t *RedconTransport) SetHeartbeatHandler(cb func(rpc raft.RPC)) {}
 // The args are the command arguments such as "SET", "key", "value".
 // Return response is a bulk, string, or an error.
 // The nbuf is a reuseable buffer, this can be ignored.
-func Do(addr string, buf []byte, args ...[]byte) (resp []byte, nbuf []byte, err error) {
+func Do(addr string, buf []byte, args ...[]byte) (
+	resp []byte, nbuf []byte, err error,
+) {
 	cmd := buildCommand(buf, args...)
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
@@ -613,6 +643,7 @@ func buildCommand(buf []byte, args ...[]byte) []byte {
 	return buf
 }
 
+// ReadRawResponse reads a raw response for an input buffer reader
 func ReadRawResponse(rd *bufio.Reader) (raw []byte, kind byte, err error) {
 	kind, err = rd.ReadByte()
 	if err != nil {

@@ -25,11 +25,14 @@ func TestServer(t *testing.T) {
 			switch args := rpc.Command.(type) {
 			case *raft.RequestVoteRequest:
 				if string(args.Candidate) != "candidate" {
-					err = fmt.Errorf("expecting 'candidate', got '%v'", string(args.Candidate))
+					err = fmt.Errorf("expecting 'candidate', got '%v'",
+						string(args.Candidate))
 				} else if args.LastLogIndex != 1 {
-					err = fmt.Errorf("expecting '1', got '%v'", args.LastLogIndex)
+					err = fmt.Errorf("expecting '1', got '%v'",
+						args.LastLogIndex)
 				} else if args.LastLogTerm != 2 {
-					err = fmt.Errorf("expecting '2', got '%v'", args.LastLogTerm)
+					err = fmt.Errorf("expecting '2', got '%v'",
+						args.LastLogTerm)
 				} else if args.Term != 3 {
 					err = fmt.Errorf("expecting '3', got '%v'", args.Term)
 				} else {
@@ -41,19 +44,28 @@ func TestServer(t *testing.T) {
 				}
 			case *raft.AppendEntriesRequest:
 				if len(args.Entries) != 2 {
-					err = fmt.Errorf("expecting '2', got '%v'", len(args.Entries))
-				} else if string(args.Entries[0].Data) != "log1" || args.Entries[0].Index != 1 || args.Entries[0].Term != 2 || args.Entries[0].Type != raft.LogAddPeer {
+					err = fmt.Errorf("expecting '2', got '%v'",
+						len(args.Entries))
+				} else if string(args.Entries[0].Data) != "log1" ||
+					args.Entries[0].Index != 1 || args.Entries[0].Term != 2 ||
+					args.Entries[0].Type != raft.LogAddPeer {
 					err = fmt.Errorf("invalid log entry 1")
-				} else if string(args.Entries[1].Data) != "log2" || args.Entries[1].Index != 3 || args.Entries[1].Term != 4 || args.Entries[1].Type != raft.LogRemovePeer {
+				} else if string(args.Entries[1].Data) != "log2" ||
+					args.Entries[1].Index != 3 || args.Entries[1].Term != 4 ||
+					args.Entries[1].Type != raft.LogRemovePeer {
 					err = fmt.Errorf("invalid log entry 2")
 				} else if string(args.Leader) != "leader" {
-					err = fmt.Errorf("expecting 'leader', got '%v'", string(args.Leader))
+					err = fmt.Errorf("expecting 'leader', got '%v'",
+						string(args.Leader))
 				} else if args.LeaderCommitIndex != 5 {
-					err = fmt.Errorf("expecting '5', got '%v'", args.LeaderCommitIndex)
+					err = fmt.Errorf("expecting '5', got '%v'",
+						args.LeaderCommitIndex)
 				} else if args.PrevLogEntry != 6 {
-					err = fmt.Errorf("expecting '6', got '%v'", args.PrevLogEntry)
+					err = fmt.Errorf("expecting '6', got '%v'",
+						args.PrevLogEntry)
 				} else if args.PrevLogTerm != 7 {
-					err = fmt.Errorf("expecting '7', got '%v'", args.PrevLogTerm)
+					err = fmt.Errorf("expecting '7', got '%v'",
+						args.PrevLogTerm)
 				} else if args.Term != 8 {
 					err = fmt.Errorf("expecting '8', got '%v'", args.Term)
 				} else {
@@ -66,13 +78,17 @@ func TestServer(t *testing.T) {
 				}
 			case *raft.InstallSnapshotRequest:
 				if args.LastLogIndex != 1 {
-					err = fmt.Errorf("expecting '1', got '%v'", args.LastLogIndex)
+					err = fmt.Errorf("expecting '1', got '%v'",
+						args.LastLogIndex)
 				} else if args.LastLogTerm != 2 {
-					err = fmt.Errorf("expecting '2', got '%v'", args.LastLogTerm)
+					err = fmt.Errorf("expecting '2', got '%v'",
+						args.LastLogTerm)
 				} else if string(args.Leader) != "leader" {
-					err = fmt.Errorf("expecting 'leader', got '%v'", string(args.Leader))
+					err = fmt.Errorf("expecting 'leader', got '%v'",
+						string(args.Leader))
 				} else if string(args.Peers) != "peers" {
-					err = fmt.Errorf("expecting 'peers', got '%v'", string(args.Peers))
+					err = fmt.Errorf("expecting 'peers', got '%v'",
+						string(args.Peers))
 				} else if args.Size != 3 {
 					err = fmt.Errorf("expecting '3', got '%v'", args.Size)
 				} else if args.Term != 4 {
@@ -82,7 +98,8 @@ func TestServer(t *testing.T) {
 					data, err = ioutil.ReadAll(rpc.Reader)
 					if err == nil {
 						if string(data) != "look ma, i've gots the data!" {
-							err = fmt.Errorf("expecting 'look ma, i've gots the data!', got '%v'", string(data))
+							err = fmt.Errorf("expecting 'look ma, i've gots "+
+								"the data!', got '%v'", string(data))
 						} else {
 							resp = &raft.InstallSnapshotResponse{
 								Success: true,
@@ -110,7 +127,9 @@ func SubInstallSnapshot(t *testing.T, s *RedconTransport) {
 	args.Peers = []byte("peers")
 	args.Size = 3
 	args.Term = 4
-	if err := s.InstallSnapshot(addr, &args, &resp, bytes.NewBufferString("look ma, i've gots the data!")); err != nil {
+	if err := s.InstallSnapshot(addr, &args, &resp,
+		bytes.NewBufferString("look ma, i've gots the data!"),
+	); err != nil {
 		t.Fatal(err)
 	}
 	if resp.Success != true {
@@ -124,8 +143,10 @@ func SubAppendEntries(t *testing.T, s *RedconTransport) {
 	var args raft.AppendEntriesRequest
 	var resp raft.AppendEntriesResponse
 	args.Entries = []*raft.Log{
-		&raft.Log{Data: []byte("log1"), Index: 1, Term: 2, Type: raft.LogAddPeer},
-		&raft.Log{Data: []byte("log2"), Index: 3, Term: 4, Type: raft.LogRemovePeer},
+		&raft.Log{Data: []byte("log1"), Index: 1, Term: 2,
+			Type: raft.LogAddPeer},
+		&raft.Log{Data: []byte("log2"), Index: 3, Term: 4,
+			Type: raft.LogRemovePeer},
 	}
 	args.Leader = []byte("leader")
 	args.LeaderCommitIndex = 5
@@ -157,22 +178,28 @@ func SubRequestVote(t *testing.T, s *RedconTransport) {
 	}
 }
 func SubPassthrough(t *testing.T, s *RedconTransport) {
-	resp, _, err := Do(addr, nil, []byte("PING"), []byte("say hi to the wicker people"))
+	resp, _, err := Do(addr, nil, []byte("PING"),
+		[]byte("say hi to the wicker people"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if string(resp) != "say hi to the wicker people" {
-		t.Fatalf("expecting 'say hi to the wicker people', got '%v'", string(resp))
+		t.Fatalf("expecting 'say hi to the wicker people', got '%v'",
+			string(resp))
 	}
 }
 
 func passthroughHandler(conn redcon.Conn, cmd redcon.Command) {
 	if string(cmd.Args[0]) != "PING" {
-		conn.WriteError("ERR " + fmt.Sprintf("expecting 'PING', got '%v'", string(cmd.Args[0])))
+		conn.WriteError("ERR " + fmt.Sprintf("expecting 'PING', got '%v'",
+			string(cmd.Args[0])))
 	} else if len(cmd.Args) != 2 {
-		conn.WriteError("ERR " + fmt.Sprintf("expecting '2', got '%v'", len(cmd.Args)))
+		conn.WriteError("ERR " + fmt.Sprintf("expecting '2', got '%v'",
+			len(cmd.Args)))
 	} else if string(cmd.Args[1]) != "say hi to the wicker people" {
-		conn.WriteError("ERR " + fmt.Sprintf("expecting 'say hi to the wicker people', got '%v'", string(cmd.Args[1])))
+		conn.WriteError("ERR " + fmt.Sprintf(
+			"expecting 'say hi to the wicker people', got '%v'",
+			string(cmd.Args[1])))
 	} else {
 		conn.WriteBulk(cmd.Args[1])
 	}
