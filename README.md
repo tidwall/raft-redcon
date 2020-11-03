@@ -1,4 +1,4 @@
-# Raft-Redcon
+# raft-redcon
 
 [![GoDoc](https://godoc.org/github.com/tidwall/raft-redcon?status.svg)](https://godoc.org/github.com/tidwall/raft-redcon)
 
